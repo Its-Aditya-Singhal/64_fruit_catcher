@@ -1,6 +1,8 @@
+import random
 import pygame
 from game.basket import Basket
 from game.fruit import Fruit, GOOD, ROTTEN, BOMB
+from game.particle import Particle
 
 # Difficulty settings: every POINTS_PER_LEVEL points the game gets harder
 BASE_SPAWN_DELAY = 750      # ms between spawns at the start
@@ -16,6 +18,7 @@ class GameEngine:
         self.height = height
         self.basket = Basket(width, height)
         self.fruits = []
+        self.particles = []
 
         self.score = 0
         self.lives = 3
@@ -34,6 +37,8 @@ class GameEngine:
                 self.reset()
 
     def update(self):
+        self.update_particles()
+
         if self.game_state != "PLAYING":
             return
 
@@ -55,6 +60,7 @@ class GameEngine:
             fruit.update()
 
             if basket_rect.colliderect(fruit.rect):
+                self.spawn_splash(fruit, self.basket.y)
                 if fruit.kind == GOOD:
                     self.score += 1
                 elif fruit.kind == ROTTEN:
@@ -71,6 +77,7 @@ class GameEngine:
                 continue
 
             if fruit.is_missed(self.height):
+                self.spawn_splash(fruit, self.height - 25)
                 self.fruits.remove(fruit)
                 if fruit.is_hazard:
                     continue   # letting rotten fruit / bombs fall is safe
@@ -79,6 +86,20 @@ class GameEngine:
                     self.lives = 0
                     self.game_state = "GAME_OVER"
                     break
+
+    def spawn_splash(self, fruit, y):
+        """Emit coloured droplets at (fruit.x, y) - used on basket catches and floor hits."""
+        if fruit.kind == BOMB:
+            colors = [(255, 150, 40), (255, 90, 40), (110, 110, 110)]   # explosion sparks
+        else:
+            colors = [fruit.color]
+        for _ in range(14):
+            self.particles.append(Particle(fruit.x, y, random.choice(colors)))
+
+    def update_particles(self):
+        for particle in self.particles:
+            particle.update()
+        self.particles = [p for p in self.particles if p.alive]
 
     def update_difficulty(self):
         """Shrink the spawn delay and raise the base falling speed as score climbs."""
@@ -89,6 +110,7 @@ class GameEngine:
     def reset(self):
         self.basket = Basket(self.width, self.height)
         self.fruits.clear()
+        self.particles.clear()
         self.score = 0
         self.lives = 3
         self.level = 0
@@ -106,6 +128,8 @@ class GameEngine:
         self.basket.render(screen)
         for fruit in self.fruits:
             fruit.render(screen)
+        for particle in self.particles:
+            particle.render(screen)
 
         score_surf = self.font_medium.render(f"Score: {self.score}", True, (255, 220, 80))
         screen.blit(score_surf, (25, 20))
