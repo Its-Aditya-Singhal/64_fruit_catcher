@@ -2,6 +2,14 @@ import pygame
 from game.basket import Basket
 from game.fruit import Fruit, GOOD, ROTTEN, BOMB
 
+# Difficulty settings: every POINTS_PER_LEVEL points the game gets harder
+BASE_SPAWN_DELAY = 750      # ms between spawns at the start
+MIN_SPAWN_DELAY = 250       # spawn delay never goes below this
+SPAWN_DELAY_STEP = 50       # ms removed from the delay each level
+SPEED_STEP = 0.5            # extra falling speed added each level
+MAX_SPEED_BOOST = 5.0       # cap so the game stays playable
+POINTS_PER_LEVEL = 5
+
 class GameEngine:
     def __init__(self, width, height):
         self.width = width
@@ -11,7 +19,9 @@ class GameEngine:
 
         self.score = 0
         self.lives = 3
-        self.spawn_delay = 750
+        self.level = 0
+        self.speed_boost = 0.0
+        self.spawn_delay = BASE_SPAWN_DELAY
         self.last_spawn_time = pygame.time.get_ticks()
         self.game_state = "PLAYING"
 
@@ -33,9 +43,11 @@ class GameEngine:
         if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
             self.basket.move_right()
 
+        self.update_difficulty()
+
         now = pygame.time.get_ticks()
         if now - self.last_spawn_time >= self.spawn_delay:
-            self.fruits.append(Fruit(self.width))
+            self.fruits.append(Fruit(self.width, speed_boost=self.speed_boost))
             self.last_spawn_time = now
 
         basket_rect = self.basket.rect
@@ -68,11 +80,20 @@ class GameEngine:
                     self.game_state = "GAME_OVER"
                     break
 
+    def update_difficulty(self):
+        """Shrink the spawn delay and raise the base falling speed as score climbs."""
+        self.level = self.score // POINTS_PER_LEVEL
+        self.spawn_delay = max(MIN_SPAWN_DELAY, BASE_SPAWN_DELAY - self.level * SPAWN_DELAY_STEP)
+        self.speed_boost = min(MAX_SPEED_BOOST, self.level * SPEED_STEP)
+
     def reset(self):
         self.basket = Basket(self.width, self.height)
         self.fruits.clear()
         self.score = 0
         self.lives = 3
+        self.level = 0
+        self.speed_boost = 0.0
+        self.spawn_delay = BASE_SPAWN_DELAY
         self.last_spawn_time = pygame.time.get_ticks()
         self.game_state = "PLAYING"
 
@@ -88,6 +109,9 @@ class GameEngine:
 
         score_surf = self.font_medium.render(f"Score: {self.score}", True, (255, 220, 80))
         screen.blit(score_surf, (25, 20))
+
+        level_surf = self.font_medium.render(f"Level: {self.level + 1}", True, (140, 200, 255))
+        screen.blit(level_surf, (self.width // 2 - level_surf.get_width() // 2, 20))
 
         lives_surf = self.font_medium.render(f"Lives: {self.lives}", True, (240, 80, 80))
         screen.blit(lives_surf, (self.width - lives_surf.get_width() - 25, 20))
