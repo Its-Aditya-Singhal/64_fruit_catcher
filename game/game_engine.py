@@ -1,6 +1,6 @@
 import pygame
 from game.basket import Basket
-from game.fruit import Fruit
+from game.fruit import Fruit, GOOD, ROTTEN, BOMB
 
 class GameEngine:
     def __init__(self, width, height):
@@ -43,16 +43,26 @@ class GameEngine:
             fruit.update()
 
             if basket_rect.colliderect(fruit.rect):
-
-                self.score += 1
-
+                if fruit.kind == GOOD:
+                    self.score += 1
+                elif fruit.kind == ROTTEN:
+                    self.score = max(0, self.score - 2)   # rotten fruit: score penalty
+                elif fruit.kind == BOMB:
+                    self.lives -= 1                       # bomb: lose a life
+                    if self.lives <= 0:
+                        self.lives = 0
+                        self.game_state = "GAME_OVER"
 
                 self.fruits.remove(fruit)
+                if self.game_state == "GAME_OVER":
+                    break
                 continue
 
             if fruit.is_missed(self.height):
-                self.lives -= 1
                 self.fruits.remove(fruit)
+                if fruit.is_hazard:
+                    continue   # letting rotten fruit / bombs fall is safe
+                self.lives -= 1
                 if self.lives <= 0:
                     self.lives = 0
                     self.game_state = "GAME_OVER"
